@@ -1,103 +1,411 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Layout, Form, Input, Button, Table, Modal, InputNumber, Rate, Space, message, Select } from 'antd';
+import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+
+const { Content } = Layout;
+const { TextArea } = Input;
+
+interface User {
+  id: number;
+  email: string;
+  name: string;
+}
+
+interface Product {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  stock: number;
+}
+
+interface Feedback {
+  id: number;
+  content: string;
+  rating: number;
+  author: User;
+  product: Product;
+}
+
+type TableItem = User | Product | Feedback;
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'feedbacks'>('users');
+  const [data, setData] = useState<User[] | Product[] | Feedback[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [form] = Form.useForm();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'feedbacks' || isModalVisible) {
+      // Fetch users and products for feedback form
+      const fetchUsersAndProducts = async () => {
+        try {
+          const [usersResponse, productsResponse] = await Promise.all([
+            fetch('/api/users'),
+            fetch('/api/products')
+          ]);
+          
+          if (!usersResponse.ok || !productsResponse.ok) {
+            throw new Error('Failed to fetch data');
+          }
+
+          const [usersData, productsData] = await Promise.all([
+            usersResponse.json(),
+            productsResponse.json()
+          ]);
+
+          setUsers(usersData);
+          setProducts(productsData);
+        } catch (error) {
+          if (error instanceof Error) {
+            message.error(`Failed to fetch options: ${error.message}`);
+          }
+        }
+      };
+
+      fetchUsersAndProducts();
+    }
+  }, [activeTab, isModalVisible]);
+
+  const fetchData = async () => {
+    try {
+      const response = await fetch(`/api/${activeTab}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const result = await response.json();
+      setData(Array.isArray(result) ? result : []);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      message.error('Failed to fetch data: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setData([]);
+    }
+  };
+
+  const handleAdd = async (values: any) => {
+    try {
+      const response = await fetch(`/api/${activeTab}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add');
+      }
+
+      message.success('Added successfully');
+      fetchData();
+      setIsModalVisible(false);
+      form.resetFields();
+    } catch (error) {
+      console.error('Add error:', error);
+      message.error('Failed to add: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
+  const handleEdit = async (values: any) => {
+    try {
+      const response = await fetch(`/api/${activeTab}/${editingRecord.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update');
+      }
+
+      message.success('Updated successfully');
+      fetchData();
+      setIsModalVisible(false);
+      setEditingRecord(null);
+      form.resetFields();
+    } catch (error) {
+      console.error('Edit error:', error);
+      message.error('Failed to update: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await fetch(`/api/${activeTab}/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete');
+      }
+
+      message.success('Deleted successfully');
+      fetchData();
+    } catch (error) {
+      console.error('Delete error:', error);
+      message.error('Failed to delete: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
+  const columns = {
+    users: [
+      { title: 'Email', dataIndex: 'email', key: 'email' },
+      { title: 'Name', dataIndex: 'name', key: 'name' },
+      {
+        title: 'Actions',
+        key: 'actions',
+        render: (_: any, record: User) => (
+          <Space>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => {
+                setEditingRecord(record);
+                form.setFieldsValue(record);
+                setIsModalVisible(true);
+              }}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.id)}
+            />
+          </Space>
+        ),
+      },
+    ] as ColumnsType<User>,
+    products: [
+      { title: 'Name', dataIndex: 'name', key: 'name' },
+      { title: 'Description', dataIndex: 'description', key: 'description' },
+      { title: 'Price', dataIndex: 'price', key: 'price' },
+      { title: 'Stock', dataIndex: 'stock', key: 'stock' },
+      {
+        title: 'Actions',
+        key: 'actions',
+        render: (_: any, record: Product) => (
+          <Space>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => {
+                setEditingRecord(record);
+                form.setFieldsValue(record);
+                setIsModalVisible(true);
+              }}
+            />
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.id)}
+            />
+          </Space>
+        ),
+      },
+    ] as ColumnsType<Product>,
+    feedbacks: [
+      { title: 'Content', dataIndex: 'content', key: 'content' },
+      {
+        title: 'Rating',
+        dataIndex: 'rating',
+        key: 'rating',
+        render: (rating: number) => <Rate disabled defaultValue={rating} />,
+      },
+      { title: 'Author', dataIndex: ['author', 'name'], key: 'author' },
+      { title: 'Product', dataIndex: ['product', 'name'], key: 'product' },
+      {
+        title: 'Actions',
+        key: 'actions',
+        render: (_: any, record: Feedback) => (
+          <Space>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => {
+                setEditingRecord(record);
+                form.setFieldsValue({
+                  ...record,
+                  authorId: record.author.id,
+                  productId: record.product.id,
+                });
+                setIsModalVisible(true);
+              }}
+            />
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.id)}
+            />
+          </Space>
+        ),
+      },
+    ] as ColumnsType<Feedback>,
+  };
+
+  const formItems = {
+    users: (
+      <>
+        <Form.Item name="email" label="Email" rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+        <Form.Item name="name" label="Name">
+          <Input />
+        </Form.Item>
+      </>
+    ),
+    products: (
+      <>
+        <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+        <Form.Item name="description" label="Description">
+          <TextArea />
+        </Form.Item>
+        <Form.Item name="price" label="Price" rules={[{ required: true }]}>
+          <InputNumber min={0} style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name="stock" label="Stock" rules={[{ required: true }]}>
+          <InputNumber min={0} style={{ width: '100%' }} />
+        </Form.Item>
+      </>
+    ),
+    feedbacks: (
+      <>
+        <Form.Item name="content" label="Content" rules={[{ required: true }]}>
+          <TextArea />
+        </Form.Item>
+        <Form.Item name="rating" label="Rating" rules={[{ required: true }]}>
+          <Rate />
+        </Form.Item>
+        <Form.Item name="authorId" label="Author" rules={[{ required: true }]}>
+          <Select
+            showSearch
+            placeholder="Select an author"
+            optionFilterProp="children"
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={users.map(user => ({
+              value: user.id,
+              label: `${user.name} (${user.email})`
+            }))}
+          />
+        </Form.Item>
+        <Form.Item name="productId" label="Product" rules={[{ required: true }]}>
+          <Select
+            showSearch
+            placeholder="Select a product"
+            optionFilterProp="children"
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={products.map(product => ({
+              value: product.id,
+              label: product.name
+            }))}
+          />
+        </Form.Item>
+      </>
+    ),
+  };
+
+  const renderTable = () => {
+    switch (activeTab) {
+      case 'users':
+        return (
+          <Table<User>
+            columns={columns.users}
+            dataSource={Array.isArray(data) ? (data as User[]) : []}
+            rowKey="id"
+          />
+        );
+      case 'products':
+        return (
+          <Table<Product>
+            columns={columns.products}
+            dataSource={Array.isArray(data) ? (data as Product[]) : []}
+            rowKey="id"
+          />
+        );
+      case 'feedbacks':
+        return (
+          <Table<Feedback>
+            columns={columns.feedbacks}
+            dataSource={Array.isArray(data) ? (data as Feedback[]) : []}
+            rowKey="id"
+          />
+        );
+    }
+  };
+
+  return (
+    <Layout>
+      <Content style={{ padding: '24px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
+          <Button
+            type={activeTab === 'users' ? 'primary' : 'default'}
+            onClick={() => setActiveTab('users')}
           >
-            Read our docs
-          </a>
+            Users
+          </Button>
+          <Button
+            type={activeTab === 'products' ? 'primary' : 'default'}
+            onClick={() => setActiveTab('products')}
+          >
+            Products
+          </Button>
+          <Button
+            type={activeTab === 'feedbacks' ? 'primary' : 'default'}
+            onClick={() => setActiveTab('feedbacks')}
+          >
+            Feedbacks
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setEditingRecord(null);
+              form.resetFields();
+              setIsModalVisible(true);
+            }}
+          >
+            Add New
+          </Button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+
+        {renderTable()}
+
+        <Modal
+          title={`${editingRecord ? 'Edit' : 'Add'} ${activeTab.slice(0, -1)}`}
+          open={isModalVisible}
+          onCancel={() => {
+            setIsModalVisible(false);
+            setEditingRecord(null);
+            form.resetFields();
+          }}
+          footer={null}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={editingRecord ? handleEdit : handleAdd}
+          >
+            {formItems[activeTab]}
+            <Form.Item>
+              <Button type="primary" htmlType="submit">
+                {editingRecord ? 'Save' : 'Add'}
+              </Button>
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Content>
+    </Layout>
   );
 }
