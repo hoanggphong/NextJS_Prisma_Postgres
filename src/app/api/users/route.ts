@@ -1,15 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - email
+ *       properties:
+ *         id:
+ *           type: integer
+ *           description: The auto-generated id of the user
+ *         email:
+ *           type: string
+ *           description: The user's email
+ *         name:
+ *           type: string
+ *           description: The user's name
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: The timestamp when the user was created
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: The timestamp when the user was last updated
+ */
 
 /**
  * @swagger
  * /api/users:
  *   get:
- *     description: Returns all users
+ *     summary: Returns all users
+ *     tags: [Users]
  *     responses:
  *       200:
  *         description: List of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/User'
+ *       500:
+ *         description: Server error
  */
 export async function GET() {
   try {
@@ -32,21 +68,34 @@ export async function GET() {
  * @swagger
  * /api/users:
  *   post:
- *     description: Create a new user
+ *     summary: Create a new user
+ *     tags: [Users]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - email
  *             properties:
  *               email:
  *                 type: string
+ *                 description: The user's email
  *               name:
  *                 type: string
+ *                 description: The user's name
  *     responses:
  *       201:
  *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Invalid request body or email already exists
+ *       500:
+ *         description: Server error
  */
 export async function POST(request: NextRequest) {
   try {

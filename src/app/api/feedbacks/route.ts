@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma';
  * @swagger
  * /api/feedbacks:
  *   get:
- *     description: Returns all feedbacks
+ *     summary: Returns all feedbacks
+ *     tags: [Feedbacks]
  *     responses:
  *       200:
  *         description: List of feedbacks
@@ -31,7 +32,8 @@ export async function GET() {
  * @swagger
  * /api/feedbacks:
  *   post:
- *     description: Create a new feedback
+ *     summary: Create a new feedback
+ *     tags: [Feedbacks]
  *     requestBody:
  *       required: true
  *       content:
