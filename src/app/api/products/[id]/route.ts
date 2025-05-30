@@ -51,12 +51,30 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    if (!params?.id) {
+      return NextResponse.json(
+        { error: 'Product ID is required' },
+        { status: 400 }
+      );
+    }
+
     const id = parseInt(params.id);
+    
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: 'Invalid product ID format' },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
 
     // Check if product exists
     const existingProduct = await prisma.product.findUnique({
       where: { id },
+      include: {
+        category: true
+      }
     });
 
     if (!existingProduct) {
@@ -66,6 +84,20 @@ export async function PUT(
       );
     }
 
+    // If categoryId is provided, check if the category exists
+    if (body.categoryId) {
+      const category = await prisma.category.findUnique({
+        where: { id: body.categoryId },
+      });
+
+      if (!category) {
+        return NextResponse.json(
+          { error: 'Category not found' },
+          { status: 404 }
+        );
+      }
+    }
+
     const product = await prisma.product.update({
       where: { id },
       data: {
@@ -73,7 +105,16 @@ export async function PUT(
         description: body.description,
         price: body.price,
         stock: body.stock,
+        categoryId: body.categoryId
       },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
     });
     return NextResponse.json(product);
   } catch (error) {
@@ -111,7 +152,21 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    if (!params?.id) {
+      return NextResponse.json(
+        { error: 'Product ID is required' },
+        { status: 400 }
+      );
+    }
+
     const id = parseInt(params.id);
+    
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: 'Invalid product ID format' },
+        { status: 400 }
+      );
+    }
 
     // Check if product exists
     const existingProduct = await prisma.product.findUnique({

@@ -60,6 +60,12 @@ export async function GET() {
     const products = await prisma.product.findMany({
       include: {
         feedbacks: true,
+        category: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       },
     });
     return NextResponse.json(products);
@@ -87,6 +93,7 @@ export async function GET() {
  *             required:
  *               - name
  *               - price
+ *               - categoryId
  *             properties:
  *               name:
  *                 type: string
@@ -101,6 +108,9 @@ export async function GET() {
  *               stock:
  *                 type: integer
  *                 description: The product stock quantity
+ *               categoryId:
+ *                 type: integer
+ *                 description: The ID of the category this product belongs to
  *     responses:
  *       201:
  *         description: Product created successfully
@@ -117,9 +127,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    if (!body.name || typeof body.price !== 'number') {
+    if (!body.name || typeof body.price !== 'number' || !body.categoryId) {
       return NextResponse.json(
-        { error: 'Name and price are required' },
+        { error: 'Name, price, and categoryId are required' },
         { status: 400 }
       );
     }
@@ -130,6 +140,7 @@ export async function POST(request: NextRequest) {
         description: body.description || '',
         price: body.price,
         stock: body.stock || 0,
+        categoryId: body.categoryId,
       },
     });
     return NextResponse.json(product, { status: 201 });

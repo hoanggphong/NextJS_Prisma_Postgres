@@ -19,6 +19,7 @@ interface Product {
   name: string;
   description: string;
   price: number;
+  category: Category;
   stock: number;
 }
 
@@ -29,14 +30,19 @@ interface Feedback {
   author: User;
   product: Product;
 }
+interface Category {
+  id: number;
+  name: string;
+}
 
-type TableItem = User | Product | Feedback;
+type TableItem = User | Product | Feedback | Category;
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'feedbacks'>('users');
-  const [data, setData] = useState<User[] | Product[] | Feedback[]>([]);
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'feedbacks' | 'categories'>('users');
+  const [data, setData] = useState<User[] | Product[] | Feedback[] | Category[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [form] = Form.useForm();
@@ -50,22 +56,25 @@ export default function Home() {
       // Fetch users and products for feedback form
       const fetchUsersAndProducts = async () => {
         try {
-          const [usersResponse, productsResponse] = await Promise.all([
+          const [usersResponse, productsResponse, categoriesResponse] = await Promise.all([
             fetch('/api/users'),
-            fetch('/api/products')
+            fetch('/api/products'),
+            fetch('/api/categories')
           ]);
           
-          if (!usersResponse.ok || !productsResponse.ok) {
+          if (!usersResponse.ok || !productsResponse.ok || !categoriesResponse.ok) {
             throw new Error('Failed to fetch data');
           }
 
-          const [usersData, productsData] = await Promise.all([
+          const [usersData, productsData, categoriesData] = await Promise.all([
             usersResponse.json(),
-            productsResponse.json()
+            productsResponse.json(),
+            categoriesResponse.json()
           ]);
 
           setUsers(usersData);
           setProducts(productsData);
+          setCategories(categoriesData);
         } catch (error) {
           if (error instanceof Error) {
             message.error(`Failed to fetch options: ${error.message}`);
@@ -188,6 +197,12 @@ export default function Home() {
       { title: 'Name', dataIndex: 'name', key: 'name' },
       { title: 'Description', dataIndex: 'description', key: 'description' },
       { title: 'Price', dataIndex: 'price', key: 'price' },
+      { 
+        title: 'Category', 
+        dataIndex: ['category', 'name'], 
+        key: 'category',
+        render: (_: any, record: Product) => record.category?.name || 'N/A'
+      },
       { title: 'Stock', dataIndex: 'stock', key: 'stock' },
       {
         title: 'Actions',
@@ -247,6 +262,30 @@ export default function Home() {
         ),
       },
     ] as ColumnsType<Feedback>,
+    categories: [
+      { title: 'Name', dataIndex: 'name', key: 'name' },
+      {
+        title: 'Actions',
+        key: 'actions',
+        render: (_: any, record: Category) => (
+          <Space>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => {
+                setEditingRecord(record);
+                form.setFieldsValue(record);
+                setIsModalVisible(true);
+              }}
+            />
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.id)}
+            />
+          </Space>
+        ),
+      },
+    ] as ColumnsType<Category>,
   };
 
   const formItems = {
@@ -270,6 +309,20 @@ export default function Home() {
         </Form.Item>
         <Form.Item name="price" label="Price" rules={[{ required: true }]}>
           <InputNumber min={0} style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name="categoryId" label="Category11" rules={[{ required: true }]}>
+          <Select
+            showSearch
+            placeholder="Select a category"
+            optionFilterProp="children"
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={categories.map(category => ({
+              value: category.id,
+              label: category.name
+            }))}
+          />
         </Form.Item>
         <Form.Item name="stock" label="Stock" rules={[{ required: true }]}>
           <InputNumber min={0} style={{ width: '100%' }} />
@@ -314,6 +367,13 @@ export default function Home() {
         </Form.Item>
       </>
     ),
+    categories: (
+      <>
+        <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Input />
+        </Form.Item>
+      </>
+    ),
   };
 
   const renderTable = () => {
@@ -342,6 +402,14 @@ export default function Home() {
             rowKey="id"
           />
         );
+      case 'categories':
+        return (
+          <Table<Category>
+            columns={columns.categories}
+            dataSource={Array.isArray(data) ? (data as Category[]) : []}
+            rowKey="id"
+          />
+        );
     }
   };
 
@@ -366,6 +434,12 @@ export default function Home() {
             onClick={() => setActiveTab('feedbacks')}
           >
             Feedbacks
+          </Button>
+          <Button
+            type={activeTab === 'categories' ? 'primary' : 'default'}
+            onClick={() => setActiveTab('categories')}
+          >
+            Categories
           </Button>
           <Button
             type="primary"
