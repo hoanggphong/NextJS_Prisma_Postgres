@@ -22,6 +22,7 @@ interface Product {
   price: number;
   category: Category;
   stock: number;
+  brand: Brand;
 }
 
 interface Feedback {
@@ -37,14 +38,20 @@ interface Category {
   name: string;
 }
 
+interface Brand {
+  id: number;
+  name: string;
+}
+
 type TableItem = User | Product | Feedback | Category;
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'feedbacks' | 'categories'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'feedbacks' | 'categories' | 'brands'>('users');
   const [data, setData] = useState<User[] | Product[] | Feedback[] | Category[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [form] = Form.useForm();
@@ -58,25 +65,28 @@ export default function AdminPage() {
       // Fetch users and products for feedback form
       const fetchUsersAndProducts = async () => {
         try {
-          const [usersResponse, productsResponse, categoriesResponse] = await Promise.all([
+          const [usersResponse, productsResponse, categoriesResponse, brandsResponse] = await Promise.all([
             fetch('/api/users'),
             fetch('/api/products'),
-            fetch('/api/categories')
+            fetch('/api/categories'),
+            fetch('/api/brands')
           ]);
           
-          if (!usersResponse.ok || !productsResponse.ok || !categoriesResponse.ok) {
+          if (!usersResponse.ok || !productsResponse.ok || !categoriesResponse.ok || !brandsResponse.ok) {
             throw new Error('Failed to fetch data');
           }
 
-          const [usersData, productsData, categoriesData] = await Promise.all([
+          const [usersData, productsData, categoriesData, brandsData] = await Promise.all([
             usersResponse.json(),
             productsResponse.json(),
-            categoriesResponse.json()
+            categoriesResponse.json(),
+            brandsResponse.json()
           ]);
 
           setUsers(usersData);
           setProducts(productsData);
           setCategories(categoriesData);
+          setBrands(brandsData);
         } catch (error) {
           if (error instanceof Error) {
             message.error(`Failed to fetch options: ${error.message}`);
@@ -207,6 +217,12 @@ export default function AdminPage() {
       },
       { title: 'Stock', dataIndex: 'stock', key: 'stock' },
       {
+        title: 'Brand',
+        dataIndex: ['brand', 'name'],
+        key: 'brand',
+        render: (_: any, record: Product) => record.brand?.name || 'N/A'
+      },
+      {
         title: 'Actions',
         key: 'actions',
         render: (_: any, record: Product) => (
@@ -288,6 +304,30 @@ export default function AdminPage() {
         ),
       },
     ] as ColumnsType<Category>,
+    brands: [
+        { title: 'Name', dataIndex: 'name', key: 'name' },
+        {
+          title: 'Actions',
+          key: 'actions',
+          render: (_: any, record: Brand) => (
+            <Space>
+              <Button
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingRecord(record);
+                  form.setFieldsValue(record);
+                  setIsModalVisible(true);
+                }}
+              />
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDelete(record.id)}
+              />
+            </Space>
+          ),
+        },
+      ] as ColumnsType<Brand>,
   };
 
   const formItems = {
@@ -328,6 +368,20 @@ export default function AdminPage() {
         </Form.Item>
         <Form.Item name="stock" label="Stock" rules={[{ required: true }]}>
           <InputNumber min={0} style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name="brandId" label="Brand" rules={[{ required: true }]}>
+          <Select
+            showSearch
+            placeholder="Select a brand"
+            optionFilterProp="children"
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={brands.map(brand => ({
+              value: brand.id,
+              label: brand.name
+            }))}
+          />
         </Form.Item>
       </>
     ),
@@ -376,6 +430,13 @@ export default function AdminPage() {
         </Form.Item>
       </>
     ),
+    brands: (
+        <>
+          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+        </>
+      ),
   };
 
   const renderTable = () => {
@@ -412,6 +473,14 @@ export default function AdminPage() {
             rowKey="id"
           />
         );
+      case 'brands':
+        return (
+          <Table<Brand>
+            columns={columns.brands}
+            dataSource={Array.isArray(data) ? (data as Brand[]) : []}
+            rowKey="id"
+          />
+        );
     }
   };
 
@@ -445,6 +514,12 @@ export default function AdminPage() {
             onClick={() => setActiveTab('categories')}
           >
             Categories
+          </Button>
+          <Button
+            type={activeTab === 'brands' ? 'primary' : 'default'}
+            onClick={() => setActiveTab('brands')}
+          >
+            Brands
           </Button>
           <Button
             type="primary"

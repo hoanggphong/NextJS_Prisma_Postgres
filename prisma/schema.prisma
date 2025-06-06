@@ -23,16 +23,18 @@ model User {
 }
 
 model Product {
-  id          Int        @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   name        String
-  description String?
+  description String
   price       Float
-  stock       Int        @default(0)
-  categoryId  Int
-  category    Category @relation(fields: [categoryId], references: [id])
+  stock       Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  category    Category? @relation(fields: [categoryId], references: [id])
+  categoryId  Int?
   feedbacks   Feedback[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  brandId     Int?
+  brand       Brand?    @relation(fields: [brandId], references: [id])
 }
 
 model Feedback {
@@ -51,5 +53,12 @@ model Category {
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  products  Product[]
+}
+model Brand {
+  id        Int       @id @default(autoincrement())
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   products  Product[]
 }

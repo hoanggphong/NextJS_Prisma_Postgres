@@ -65,6 +65,12 @@ export async function GET() {
             id: true,
             name: true
           }
+        },
+        brand: {
+          select: {
+            id: true,
+            name: true
+          }
         }
       },
     });
